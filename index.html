@@ -1,104 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
-    <meta charset="UTF-8">
+    <title>Itinéraire avec OpenStreetMap et OSRM</title>
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        #map {
+            width: 100%;
+            height: 600px;
+        }
+    </style>
 </head>
-
 <body>
-
-    <p>Votre position actuelle est : <span id="position"></span></p>
-
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        // Coordonnées de la destination
-        var destinationLat = 5.3420609; // Latitude de la destination
-        var destinationLng = -4.000762; // Longitude de la destination
-        var distanceThreshold = 30; // Distance maximale en mètres pour considérer que l'on est arrivé
-    
-        // Fonction pour comparer la position actuelle avec la destination
-        function checkPosition() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        var latitude = position.coords.latitude;
-                        var longitude = position.coords.longitude;
-                        document.getElementById("position").textContent = "Latitude : \[" + latitude + "\], Longitude : \[" + longitude + "\]";
-    
-                        // Calculer la distance entre la position actuelle et la destination
-                        var distance = calculateDistance(latitude, longitude, destinationLat, destinationLng);
-                        console.log("Distance à la destination : " + distance + " mètres");
-    
-                        // Si l'utilisateur est arrivé à destination, lire un message vocal
-                        if (distance <= distanceThreshold) {
-                            speakMessage("Vous êtes arrivé à destination.");
-                        }
-                    },
-                    function(error) {
-                        handleGeolocationError(error);
-                    }
-                );
-            } else {
-                alert("Désolé, votre navigateur ne prend pas en charge la géolocalisation.");
-            }
+        // Initialiser la carte
+        var map = L.map('map').setView([5.343087, -4.000802], 13); // Paris
+
+        // Ajouter une couche de tuiles OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Coordonnées des points de départ et d'arrivée
+        var start = [5.343087, -4.000802]; // Paris
+        var end = [5.343030, -4.00052]; // Tour Eiffel
+
+        // Ajouter des marqueurs pour les points de départ et d'arrivée
+        L.marker(start).addTo(map).bindPopup('debut').openPopup();
+        L.marker(end).addTo(map).bindPopup('fin').openPopup();
+
+        // Fonction pour obtenir l'itinéraire depuis l'API OSRM
+        function getRoute(start, end) {
+            var url = `http://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    var route = data.routes[0];
+                    var distance = route.distance; // Distance en mètres
+                    var duration = route.duration; // Durée en secondes
+                    var geometry = route.geometry;
+
+                    // Afficher la distance et la durée
+                    alert(`Distance: ${distance} mètres\nDurée: ${(duration / 60).toFixed(2)} minutes`);
+
+                    // Ajouter l'itinéraire sur la carte
+                    var routeLayer = L.geoJSON(geometry).addTo(map);
+                    map.fitBounds(routeLayer.getBounds());
+                })
+                .catch(err => console.error(err));
         }
-    
-        // Fonction pour calculer la distance entre deux points
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            var R = 6371e3; // Rayon de la Terre en mètres
-            var φ1 = toRadians(lat1);
-            var φ2 = toRadians(lat2);
-            var Δφ = toRadians(lat2 - lat1);
-            var Δλ = toRadians(lon2 - lon1);
-    
-            var a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                   Math.cos(φ1) * Math.cos(φ2) *
-                   Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
-            return R * c; // Distance en mètres
-        }
-    
-        // Fonction pour convertir des degrés en radians
-        function toRadians(degrees) {
-            return degrees * Math.PI / 180;
-        }
-    
-        // Fonction pour lire un message vocal
-        function speakMessage(message) {
-            if ('speechSynthesis' in window) {
-                var utterance = new SpeechSynthesisUtterance(message);
-                utterance.lang = 'fr-FR'; // Définir la langue du message vocal
-                window.speechSynthesis.speak(utterance);
-            } else {
-                alert("Désolé, votre navigateur ne prend pas en charge la synthèse vocale.");
-            }
-        }
-    
-        // Fonction pour gérer les erreurs de géolocalisation
-        function handleGeolocationError(error) {
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    alert("Vous avez refusé l'accès à votre position.");
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    alert("Impossible de déterminer votre position.");
-                    break;
-                case error.TIMEOUT:
-                    alert("Le temps de réponse du service de géolocalisation a expiré.");
-                    break;
-                case error.UNKNOWN_ERROR:
-                    alert("Une erreur inconnue est survenue.");
-                    break;
-            }
-        }
-    
-        // Vérifier la position toutes les 10 secondes
-        setInterval(checkPosition, 10000);
+
+        // Obtenir et afficher l'itinéraire
+        getRoute(start, end);
     </script>
-    
-
 </body>
-
 </html>
